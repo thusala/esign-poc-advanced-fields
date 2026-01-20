@@ -16,6 +16,7 @@ interface PDFCanvasProps {
   onUpdateFieldValue: (fieldId: number, value: string) => void;
   onUpdateFieldPosition: (fieldId: number, x: number, y: number) => void;
   onUpdateFieldSize: (fieldId: number, width: number, height: number) => void;
+  onResetFieldToBase: (fieldId: number) => void;
   pageDimensions?: { width: number; height: number };
 }
 
@@ -31,6 +32,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   onUpdateFieldValue,
   onUpdateFieldPosition,
   onUpdateFieldSize,
+  onResetFieldToBase,
   pageDimensions,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,6 +86,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           onUpdateValue={onUpdateFieldValue}
           onUpdatePosition={onUpdateFieldPosition}
           onUpdateSize={onUpdateFieldSize}
+          onResetToBase={onResetFieldToBase}
           pageDimensions={pageDimensions}
         />
       ))}

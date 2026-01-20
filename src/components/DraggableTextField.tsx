@@ -1,7 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Box, Paper, Typography } from "@mui/material";
-import { type TextField, AppMode, FIELD_PADDING } from "../types/types";
+import {
+  type TextField,
+  AppMode,
+  FIELD_PADDING,
+  MIN_FIELD_SIZE,
+} from "../types/types";
 
 interface DraggableTextFieldProps {
   field: TextField;
@@ -13,6 +18,7 @@ interface DraggableTextFieldProps {
   onUpdateValue?: (fieldId: number, value: string) => void;
   onUpdatePosition?: (fieldId: number, x: number, y: number) => void;
   onUpdateSize?: (fieldId: number, width: number, height: number) => void;
+  onResetToBase?: (fieldId: number) => void;
   pageDimensions?: { width: number; height: number };
 }
 
@@ -26,11 +32,12 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
   onUpdateValue,
   onUpdatePosition,
   onUpdateSize,
+  onResetToBase,
   pageDimensions,
 }) => {
   const fieldRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const measureRef = useRef<HTMLPreElement>(null);
   const [localValue, setLocalValue] = useState(field.value || "");
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -52,6 +59,9 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
       outline: "none",
       background: "transparent",
       padding: `${FIELD_PADDING.vertical * zoomLevel}px ${FIELD_PADDING.horizontal * zoomLevel}px`,
+      resize: "none",
+      overflow: "hidden",
+      lineHeight: "1.4",
     };
   };
 
@@ -59,8 +69,16 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
   const calculateAndUpdateSize = (text: string) => {
     if (!measureRef.current || !field.autoResize || !pageDimensions) return;
 
+    // If text is empty, reset to base size
+    if (!text || text.trim() === "") {
+      if (onResetToBase) {
+        onResetToBase(field.id);
+      }
+      return;
+    }
+
     // Set the text to measure
-    measureRef.current.textContent = text || field.placeholder;
+    measureRef.current.textContent = text;
 
     const rect = measureRef.current.getBoundingClientRect();
     const contentWidth = rect.width / zoomLevel;
@@ -73,17 +91,9 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
     let newWidth = Math.ceil(contentWidth + totalHorizontalPadding);
     let newHeight = Math.ceil(contentHeight + totalVerticalPadding);
 
-    // Apply minimum constraints
-    const minWidth = 80;
-    const minHeight = 24;
-    newWidth = Math.max(minWidth, newWidth);
-    newHeight = Math.max(minHeight, newHeight);
-
-    // If no text, use standard size based on placeholder
-    if (!text) {
-      newWidth = Math.max(103, newWidth);
-      newHeight = Math.max(27, newHeight);
-    }
+    // Apply minimum constraints (base size)
+    newWidth = Math.max(MIN_FIELD_SIZE.width, newWidth);
+    newHeight = Math.max(MIN_FIELD_SIZE.height, newHeight);
 
     // Check if size changed significantly (more than 2px difference)
     if (
@@ -137,10 +147,23 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
     mode,
   ]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setLocalValue(newValue);
     onUpdateValue?.(field.id, newValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Allow Shift+Enter for new line
+    if (e.key === "Enter" && e.shiftKey) {
+      // Let the default behavior happen (new line)
+      return;
+    }
+
+    // Prevent default Enter (single line break)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+    }
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -150,15 +173,24 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
     }
   };
 
+  // Auto-adjust textarea height
+  useEffect(() => {
+    if (textareaRef.current && mode === AppMode.SIGN) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [localValue, mode]);
+
   return (
     <>
-      {/* Hidden measurement span for calculating text dimensions */}
-      <span
+      {/* Hidden measurement element for calculating text dimensions */}
+      <pre
         ref={measureRef}
         style={{
           position: "absolute",
           visibility: "hidden",
-          whiteSpace: "nowrap",
+          whiteSpace: "pre-wrap",
+          wordWrap: "break-word",
           fontFamily: field.style.fontFamily,
           fontSize: `${field.style.fontSize * zoomLevel}px`,
           fontWeight: field.style.bold ? "bold" : "normal",
@@ -166,6 +198,10 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
           textDecoration: field.style.underline ? "underline" : "none",
           padding: `${FIELD_PADDING.vertical * zoomLevel}px ${FIELD_PADDING.horizontal * zoomLevel}px`,
           pointerEvents: "none",
+          lineHeight: "1.4",
+          margin: 0,
+          border: "none",
+          maxWidth: `${field.width * zoomLevel}px`,
         }}
       />
 
@@ -198,7 +234,7 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
               : "text",
           opacity: isDragging ? 0.5 : 1,
           display: "flex",
-          alignItems: "center",
+          alignItems: mode === AppMode.SIGN ? "flex-start" : "center",
           overflow: "hidden",
           transition:
             mode === AppMode.SIGN && field.autoResize
@@ -228,16 +264,18 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
             {field.placeholder}
           </Typography>
         ) : (
-          <input
-            ref={inputRef}
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={localValue}
-            onChange={handleInputChange}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
             placeholder={field.placeholder}
             style={{
               ...getFontStyle(),
-              lineHeight: "normal",
+              minHeight: `${(field.baseHeight || MIN_FIELD_SIZE.height) * zoomLevel}px`,
+              height: "auto",
             }}
+            rows={1}
           />
         )}
 

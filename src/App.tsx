@@ -18,7 +18,6 @@ import {
   STANDARD_FIELD_SIZE,
 } from "./types/types";
 
-// Place your PDF in the public folder and update this path
 const PDF_PATH = "/sample.pdf";
 
 const App: React.FC = () => {
@@ -44,7 +43,6 @@ const App: React.FC = () => {
     zoomLevel,
   );
 
-  // Get selected field object
   const selectedField = fields.find((f) => f.id === selectedFieldId) || null;
 
   const handleAddField = useCallback(() => {
@@ -62,6 +60,10 @@ const App: React.FC = () => {
       style: { ...currentStyle },
       value: "",
       autoResize: true,
+      baseX: 50,
+      baseY: 50,
+      baseWidth: STANDARD_FIELD_SIZE.width,
+      baseHeight: STANDARD_FIELD_SIZE.height,
       colorCodes: {
         background: "rgba(33, 150, 243, 0.1)",
         border: "#2196f3",
@@ -78,10 +80,40 @@ const App: React.FC = () => {
       if (!selectedFieldId) return;
 
       setFields((prev) =>
-        prev.map((f) => (f.id === selectedFieldId ? { ...f, ...updates } : f)),
+        prev.map((f) => {
+          if (f.id === selectedFieldId) {
+            const updatedField = { ...f, ...updates };
+
+            // If position or size changed, check boundaries
+            if (
+              updates.width !== undefined ||
+              updates.height !== undefined ||
+              updates.x !== undefined ||
+              updates.y !== undefined
+            ) {
+              const pageDims = getPageDimensions(f.page);
+              if (pageDims) {
+                const maxX = pageDims.width / zoomLevel - updatedField.width;
+                const maxY = pageDims.height / zoomLevel - updatedField.height;
+
+                updatedField.x = Math.max(0, Math.min(updatedField.x, maxX));
+                updatedField.y = Math.max(0, Math.min(updatedField.y, maxY));
+              }
+            }
+
+            // Update base size if style changes in create mode
+            if (updates.style && mode === AppMode.CREATE) {
+              updatedField.baseWidth = updatedField.width;
+              updatedField.baseHeight = updatedField.height;
+            }
+
+            return updatedField;
+          }
+          return f;
+        }),
       );
     },
-    [selectedFieldId],
+    [selectedFieldId, getPageDimensions, zoomLevel, mode],
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -102,17 +134,27 @@ const App: React.FC = () => {
 
     if (!field) return;
 
-    const newX = field.x + delta.x / zoomLevel;
-    const newY = field.y + delta.y / zoomLevel;
+    let newX = field.x + delta.x / zoomLevel;
+    let newY = field.y + delta.y / zoomLevel;
+
+    // Constrain to page boundaries
+    const maxX = pageDimensions.width / zoomLevel - field.width;
+    const maxY = pageDimensions.height / zoomLevel - field.height;
+
+    newX = Math.max(0, Math.min(newX, maxX));
+    newY = Math.max(0, Math.min(newY, maxY));
 
     setFields((prev) =>
       prev.map((f) =>
         f.id === fieldId
           ? {
               ...f,
-              x: Math.max(0, newX),
-              y: Math.max(0, newY),
+              x: newX,
+              y: newY,
               page: pageNumber,
+              // Update base position when dragged
+              baseX: newX,
+              baseY: newY,
             }
           : f,
       ),
@@ -140,20 +182,81 @@ const App: React.FC = () => {
   const handleUpdateFieldPosition = useCallback(
     (fieldId: number, x: number, y: number) => {
       setFields((prev) =>
-        prev.map((f) => (f.id === fieldId ? { ...f, x, y } : f)),
+        prev.map((f) => {
+          if (f.id === fieldId) {
+            const pageDims = getPageDimensions(f.page);
+            if (pageDims) {
+              const maxX = pageDims.width / zoomLevel - f.width;
+              const maxY = pageDims.height / zoomLevel - f.height;
+
+              return {
+                ...f,
+                x: Math.max(0, Math.min(x, maxX)),
+                y: Math.max(0, Math.min(y, maxY)),
+              };
+            }
+          }
+          return f;
+        }),
       );
     },
-    [],
+    [getPageDimensions, zoomLevel],
   );
 
   const handleUpdateFieldSize = useCallback(
     (fieldId: number, width: number, height: number) => {
       setFields((prev) =>
-        prev.map((f) => (f.id === fieldId ? { ...f, width, height } : f)),
+        prev.map((f) => {
+          if (f.id === fieldId) {
+            const pageDims = getPageDimensions(f.page);
+            if (pageDims) {
+              // Check if new size would exceed boundaries
+              const maxX = pageDims.width / zoomLevel - width;
+              const maxY = pageDims.height / zoomLevel - height;
+
+              let adjustedX = f.x;
+              let adjustedY = f.y;
+
+              // Adjust position if field would exceed boundaries
+              if (f.x > maxX) {
+                adjustedX = Math.max(0, maxX);
+              }
+              if (f.y > maxY) {
+                adjustedY = Math.max(0, maxY);
+              }
+
+              return {
+                ...f,
+                width,
+                height,
+                x: adjustedX,
+                y: adjustedY,
+              };
+            }
+          }
+          return f;
+        }),
       );
     },
-    [],
+    [getPageDimensions, zoomLevel],
   );
+
+  const handleResetFieldToBase = useCallback((fieldId: number) => {
+    setFields((prev) =>
+      prev.map((f) => {
+        if (f.id === fieldId) {
+          return {
+            ...f,
+            x: f.baseX ?? f.x,
+            y: f.baseY ?? f.y,
+            width: f.baseWidth ?? STANDARD_FIELD_SIZE.width,
+            height: f.baseHeight ?? STANDARD_FIELD_SIZE.height,
+          };
+        }
+        return f;
+      }),
+    );
+  }, []);
 
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.25, 3));
   const handleZoomOut = () =>
@@ -291,6 +394,7 @@ const App: React.FC = () => {
                     onUpdateFieldValue={handleUpdateFieldValue}
                     onUpdateFieldPosition={handleUpdateFieldPosition}
                     onUpdateFieldSize={handleUpdateFieldSize}
+                    onResetFieldToBase={handleResetFieldToBase}
                     pageDimensions={getPageDimensions(pageNum)}
                   />
                 ),

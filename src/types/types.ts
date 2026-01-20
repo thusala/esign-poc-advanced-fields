@@ -22,7 +22,11 @@ export interface TextField {
     background: string;
     border: string;
   };
-  autoResize?: boolean; // New property to enable auto-resize
+  autoResize?: boolean;
+  baseX?: number; // Store original X position
+  baseY?: number; // Store original Y position
+  baseWidth?: number; // Store base width
+  baseHeight?: number; // Store base height
 }
 
 export enum AppMode {
@@ -35,7 +39,7 @@ export interface PageDimensions {
   height: number;
 }
 
-// Standard field dimensions
+// Standard field dimensions - base size for empty field
 export const STANDARD_FIELD_SIZE = {
   width: 103,
   height: 27,
@@ -49,6 +53,6 @@ export const FIELD_PADDING = {
 
 // Minimum field size to maintain usability
 export const MIN_FIELD_SIZE = {
-  width: 80,
-  height: 24,
+  width: 103, // Changed to match standard width
+  height: 27, // Changed to match standard height
 };
