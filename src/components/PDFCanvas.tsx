@@ -84,6 +84,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
           onUpdateValue={onUpdateFieldValue}
           onUpdatePosition={onUpdateFieldPosition}
           onUpdateSize={onUpdateFieldSize}
+          pageDimensions={pageDimensions}
         />
       ))}
     </Box>

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Box, Paper, Typography } from "@mui/material";
-import { type TextField, AppMode } from "../types/types";
+import { type TextField, AppMode, FIELD_PADDING } from "../types/types";
 
 interface DraggableTextFieldProps {
   field: TextField;
@@ -13,6 +13,7 @@ interface DraggableTextFieldProps {
   onUpdateValue?: (fieldId: number, value: string) => void;
   onUpdatePosition?: (fieldId: number, x: number, y: number) => void;
   onUpdateSize?: (fieldId: number, width: number, height: number) => void;
+  pageDimensions?: { width: number; height: number };
 }
 
 const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
@@ -25,6 +26,7 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
   onUpdateValue,
   onUpdatePosition,
   onUpdateSize,
+  pageDimensions,
 }) => {
   const fieldRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,8 +39,8 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
     disabled: mode === AppMode.SIGN,
   });
 
-  const getFontStyle = () => {
-    const styles: React.CSSProperties = {
+  const getFontStyle = (): React.CSSProperties => {
+    return {
       fontFamily: field.style.fontFamily,
       fontSize: `${field.style.fontSize * zoomLevel}px`,
       fontWeight: field.style.bold ? "bold" : "normal",
@@ -49,42 +51,91 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
       border: "none",
       outline: "none",
       background: "transparent",
-      padding: `${4 * zoomLevel}px ${8 * zoomLevel}px`,
+      padding: `${FIELD_PADDING.vertical * zoomLevel}px ${FIELD_PADDING.horizontal * zoomLevel}px`,
     };
-    return styles;
   };
 
-  // Calculate content width and adjust field size
-  const calculateContentSize = (text: string) => {
-    if (!measureRef.current || !field.autoResize) return;
+  // Calculate content size and adjust field size
+  const calculateAndUpdateSize = (text: string) => {
+    if (!measureRef.current || !field.autoResize || !pageDimensions) return;
 
+    // Set the text to measure
     measureRef.current.textContent = text || field.placeholder;
-    const contentWidth = measureRef.current.offsetWidth;
-    const contentHeight = measureRef.current.offsetHeight;
 
-    // Add padding (16px total: 8px left + 8px right)
-    const minWidth = 103;
-    const minHeight = 27;
-    const padding = 16;
+    const rect = measureRef.current.getBoundingClientRect();
+    const contentWidth = rect.width / zoomLevel;
+    const contentHeight = rect.height / zoomLevel;
 
-    const newWidth = Math.max(minWidth, contentWidth + padding);
-    const newHeight = Math.max(minHeight, contentHeight + 8); // 8px for vertical padding
+    // Add padding
+    const totalHorizontalPadding = FIELD_PADDING.horizontal * 2;
+    const totalVerticalPadding = FIELD_PADDING.vertical * 2;
 
-    // Only update if size changed significantly (more than 5px difference)
+    let newWidth = Math.ceil(contentWidth + totalHorizontalPadding);
+    let newHeight = Math.ceil(contentHeight + totalVerticalPadding);
+
+    // Apply minimum constraints
+    const minWidth = 80;
+    const minHeight = 24;
+    newWidth = Math.max(minWidth, newWidth);
+    newHeight = Math.max(minHeight, newHeight);
+
+    // If no text, use standard size based on placeholder
+    if (!text) {
+      newWidth = Math.max(103, newWidth);
+      newHeight = Math.max(27, newHeight);
+    }
+
+    // Check if size changed significantly (more than 2px difference)
     if (
-      Math.abs(newWidth - field.width) > 5 ||
-      Math.abs(newHeight - field.height) > 5
+      Math.abs(newWidth - field.width) > 2 ||
+      Math.abs(newHeight - field.height) > 2
     ) {
+      // Check page boundaries
+      const maxX = pageDimensions.width / zoomLevel - newWidth;
+      const maxY = pageDimensions.height / zoomLevel - newHeight;
+
+      let adjustedX = field.x;
+      let adjustedY = field.y;
+
+      // Adjust position if field exceeds boundaries
+      if (field.x + newWidth > pageDimensions.width / zoomLevel) {
+        adjustedX = Math.max(0, maxX);
+      }
+      if (field.y + newHeight > pageDimensions.height / zoomLevel) {
+        adjustedY = Math.max(0, maxY);
+      }
+
+      // Update position if it changed
+      if (adjustedX !== field.x || adjustedY !== field.y) {
+        onUpdatePosition?.(field.id, adjustedX, adjustedY);
+      }
+
+      // Update size
       onUpdateSize?.(field.id, newWidth, newHeight);
     }
   };
 
-  // Auto-resize when value changes
+  // Auto-resize when value changes in sign mode
   useEffect(() => {
     if (mode === AppMode.SIGN && field.autoResize) {
-      calculateContentSize(localValue);
+      calculateAndUpdateSize(localValue);
     }
   }, [localValue, mode, field.autoResize]);
+
+  // Recalculate size when style changes in create mode
+  useEffect(() => {
+    if (mode === AppMode.CREATE) {
+      calculateAndUpdateSize("");
+    }
+  }, [
+    field.style.fontFamily,
+    field.style.fontSize,
+    field.style.bold,
+    field.style.italic,
+    field.style.underline,
+    field.placeholder,
+    mode,
+  ]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -112,7 +163,9 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
           fontSize: `${field.style.fontSize * zoomLevel}px`,
           fontWeight: field.style.bold ? "bold" : "normal",
           fontStyle: field.style.italic ? "italic" : "normal",
-          padding: `${4 * zoomLevel}px ${8 * zoomLevel}px`,
+          textDecoration: field.style.underline ? "underline" : "none",
+          padding: `${FIELD_PADDING.vertical * zoomLevel}px ${FIELD_PADDING.horizontal * zoomLevel}px`,
+          pointerEvents: "none",
         }}
       />
 
@@ -149,8 +202,9 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
           overflow: "hidden",
           transition:
             mode === AppMode.SIGN && field.autoResize
-              ? "width 0.2s ease, height 0.2s ease"
+              ? "width 0.15s ease-out, height 0.15s ease-out"
               : "none",
+          boxSizing: "border-box",
           "&:hover":
             mode === AppMode.CREATE
               ? {
@@ -168,6 +222,7 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              lineHeight: "normal",
             }}
           >
             {field.placeholder}
@@ -179,7 +234,10 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
             value={localValue}
             onChange={handleInputChange}
             placeholder={field.placeholder}
-            style={getFontStyle()}
+            style={{
+              ...getFontStyle(),
+              lineHeight: "normal",
+            }}
           />
         )}
 
@@ -201,6 +259,7 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
               boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
               fontSize: `${20 * zoomLevel}px`,
               fontWeight: "bold",
+              zIndex: 10,
               "&:hover": {
                 backgroundColor: "#d32f2f",
               },
@@ -208,6 +267,9 @@ const DraggableTextField: React.FC<DraggableTextFieldProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               onDelete?.(field.id);
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
             }}
           >
             ×

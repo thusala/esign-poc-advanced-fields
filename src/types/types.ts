@@ -40,3 +40,15 @@ export const STANDARD_FIELD_SIZE = {
   width: 103,
   height: 27,
 };
+
+// Padding constants
+export const FIELD_PADDING = {
+  horizontal: 8, // 8px on each side = 16px total
+  vertical: 4, // 4px on top and bottom = 8px total
+};
+
+// Minimum field size to maintain usability
+export const MIN_FIELD_SIZE = {
+  width: 80,
+  height: 24,
+};
