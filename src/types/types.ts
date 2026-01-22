@@ -7,31 +7,56 @@ export interface TextFieldStyle {
   color: string;
 }
 
-export interface TextField {
+export interface DropdownOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface BaseField {
   id: number;
   x: number;
   y: number;
   width: number;
   height: number;
   page: number;
-  placeholder: string;
-  style: TextFieldStyle;
-  value?: string;
   userId?: string;
   colorCodes?: {
     background: string;
     border: string;
   };
-  autoResize?: boolean;
-  baseX?: number; // Store original X position
-  baseY?: number; // Store original Y position
-  baseWidth?: number; // Store base width
-  baseHeight?: number; // Store base height
+  baseX?: number;
+  baseY?: number;
+  baseWidth?: number;
+  baseHeight?: number;
 }
+
+export interface TextField extends BaseField {
+  type: "text";
+  placeholder: string;
+  style: TextFieldStyle;
+  value?: string;
+  autoResize?: boolean;
+}
+
+export interface DropdownField extends BaseField {
+  type: "dropdown";
+  placeholder: string;
+  style: TextFieldStyle;
+  options: DropdownOption[];
+  selectedValue?: string;
+}
+
+export type Field = TextField | DropdownField;
 
 export enum AppMode {
   CREATE = "create",
   SIGN = "sign",
+}
+
+export enum FieldType {
+  TEXT = "text",
+  DROPDOWN = "dropdown",
 }
 
 export interface PageDimensions {
@@ -47,12 +72,12 @@ export const STANDARD_FIELD_SIZE = {
 
 // Padding constants
 export const FIELD_PADDING = {
-  horizontal: 8, // 8px on each side = 16px total
-  vertical: 4, // 4px on top and bottom = 8px total
+  horizontal: 8,
+  vertical: 4,
 };
 
 // Minimum field size to maintain usability
 export const MIN_FIELD_SIZE = {
-  width: 103, // Changed to match standard width
-  height: 27, // Changed to match standard height
+  width: 103,
+  height: 27,
 };

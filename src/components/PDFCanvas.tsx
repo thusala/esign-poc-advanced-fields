@@ -1,14 +1,15 @@
 import React, { useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { Box } from "@mui/material";
-import { type TextField, AppMode } from "../types/types";
+import { type Field, AppMode, FieldType } from "../types/types";
 import DraggableTextField from "./DraggableTextField";
+import DraggableDropdownField from "./DraggableDropdownField";
 
 interface PDFCanvasProps {
   pageNumber: number;
   zoomLevel: number;
   onRenderPage: (pageNumber: number, canvas: HTMLCanvasElement) => void;
-  fields: TextField[];
+  fields: Field[];
   mode: AppMode;
   selectedFieldId: number | null;
   onSelectField: (fieldId: number | null) => void;
@@ -74,22 +75,41 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
     >
       <canvas ref={canvasRef} style={{ display: "block" }} />
 
-      {pageFields.map((field) => (
-        <DraggableTextField
-          key={field.id}
-          field={field}
-          zoomLevel={zoomLevel}
-          mode={mode}
-          isSelected={selectedFieldId === field.id}
-          onSelect={onSelectField}
-          onDelete={onDeleteField}
-          onUpdateValue={onUpdateFieldValue}
-          onUpdatePosition={onUpdateFieldPosition}
-          onUpdateSize={onUpdateFieldSize}
-          onResetToBase={onResetFieldToBase}
-          pageDimensions={pageDimensions}
-        />
-      ))}
+      {pageFields.map((field) => {
+        if (field.type === FieldType.TEXT) {
+          return (
+            <DraggableTextField
+              key={field.id}
+              field={field}
+              zoomLevel={zoomLevel}
+              mode={mode}
+              isSelected={selectedFieldId === field.id}
+              onSelect={onSelectField}
+              onDelete={onDeleteField}
+              onUpdateValue={onUpdateFieldValue}
+              onUpdatePosition={onUpdateFieldPosition}
+              onUpdateSize={onUpdateFieldSize}
+              onResetToBase={onResetFieldToBase}
+              pageDimensions={pageDimensions}
+            />
+          );
+        } else if (field.type === FieldType.DROPDOWN) {
+          return (
+            <DraggableDropdownField
+              key={field.id}
+              field={field}
+              zoomLevel={zoomLevel}
+              mode={mode}
+              isSelected={selectedFieldId === field.id}
+              onSelect={onSelectField}
+              onDelete={onDeleteField}
+              onUpdateValue={onUpdateFieldValue}
+              pageDimensions={pageDimensions}
+            />
+          );
+        }
+        return null;
+      })}
     </Box>
   );
 };

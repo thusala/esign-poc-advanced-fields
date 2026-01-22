@@ -12,9 +12,13 @@ import { usePDFDocument } from "./hooks/usePDFDocument";
 import PDFCanvas from "./components/PDFCanvas";
 import Sidebar from "./components/Sidebar";
 import {
+  type Field,
   type TextField,
+  type DropdownField,
   type TextFieldStyle,
+  type DropdownOption,
   AppMode,
+  FieldType,
   STANDARD_FIELD_SIZE,
 } from "./types/types";
 
@@ -23,10 +27,13 @@ const PDF_PATH = "/sample.pdf";
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.CREATE);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [fields, setFields] = useState<TextField[]>([]);
+  const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   const [nextFieldId, setNextFieldId] = useState(1);
 
+  const [currentFieldType, setCurrentFieldType] = useState<FieldType>(
+    FieldType.TEXT,
+  );
   const [currentStyle, setCurrentStyle] = useState<TextFieldStyle>({
     fontFamily: "Arial",
     fontSize: 14,
@@ -37,6 +44,13 @@ const App: React.FC = () => {
   });
   const [currentPlaceholder, setCurrentPlaceholder] =
     useState("Enter text here");
+  const [currentDropdownOptions, setCurrentDropdownOptions] = useState<
+    DropdownOption[]
+  >([
+    { id: "1", label: "Option 1", value: "option1" },
+    { id: "2", label: "Option 2", value: "option2" },
+    { id: "3", label: "Option 3", value: "option3" },
+  ]);
 
   const { numPages, loading, renderPage, getPageDimensions } = usePDFDocument(
     PDF_PATH,
@@ -49,40 +63,77 @@ const App: React.FC = () => {
     const firstPageDimensions = getPageDimensions(1);
     if (!firstPageDimensions) return;
 
-    const newField: TextField = {
-      id: nextFieldId,
-      x: 50,
-      y: 50,
-      width: STANDARD_FIELD_SIZE.width,
-      height: STANDARD_FIELD_SIZE.height,
-      page: 1,
-      placeholder: currentPlaceholder,
-      style: { ...currentStyle },
-      value: "",
-      autoResize: true,
-      baseX: 50,
-      baseY: 50,
-      baseWidth: STANDARD_FIELD_SIZE.width,
-      baseHeight: STANDARD_FIELD_SIZE.height,
-      colorCodes: {
-        background: "rgba(33, 150, 243, 0.1)",
-        border: "#2196f3",
-      },
-    };
+    let newField: Field;
+
+    if (currentFieldType === FieldType.TEXT) {
+      newField = {
+        type: FieldType.TEXT,
+        id: nextFieldId,
+        x: 50,
+        y: 50,
+        width: STANDARD_FIELD_SIZE.width,
+        height: STANDARD_FIELD_SIZE.height,
+        page: 1,
+        placeholder: currentPlaceholder,
+        style: { ...currentStyle },
+        value: "",
+        autoResize: true,
+        baseX: 50,
+        baseY: 50,
+        baseWidth: STANDARD_FIELD_SIZE.width,
+        baseHeight: STANDARD_FIELD_SIZE.height,
+        colorCodes: {
+          background: "rgba(33, 150, 243, 0.1)",
+          border: "#2196f3",
+        },
+      } as TextField;
+    } else {
+      newField = {
+        type: FieldType.DROPDOWN,
+        id: nextFieldId,
+        x: 50,
+        y: 50,
+        width: STANDARD_FIELD_SIZE.width,
+        height: STANDARD_FIELD_SIZE.height,
+        page: 1,
+        placeholder: currentPlaceholder,
+        style: { ...currentStyle },
+        options: [...currentDropdownOptions],
+        selectedValue: "",
+        baseX: 50,
+        baseY: 50,
+        baseWidth: STANDARD_FIELD_SIZE.width,
+        baseHeight: STANDARD_FIELD_SIZE.height,
+        colorCodes: {
+          background: "rgba(156, 39, 176, 0.1)",
+          border: "#9c27b0",
+        },
+      } as DropdownField;
+    }
 
     setFields((prev) => [...prev, newField]);
     setNextFieldId((prev) => prev + 1);
     setSelectedFieldId(newField.id);
-  }, [nextFieldId, currentPlaceholder, currentStyle, getPageDimensions]);
+  }, [
+    nextFieldId,
+    currentFieldType,
+    currentPlaceholder,
+    currentStyle,
+    currentDropdownOptions,
+    getPageDimensions,
+  ]);
 
   const handleUpdateSelectedField = useCallback(
-    (updates: Partial<TextField>) => {
+    (updates: Partial<Field>) => {
       if (!selectedFieldId) return;
 
       setFields((prev) =>
         prev.map((f) => {
           if (f.id === selectedFieldId) {
             const updatedField = { ...f, ...updates };
+
+            let adjustedX = updatedField.x;
+            let adjustedY = updatedField.y;
 
             // If position or size changed, check boundaries
             if (
@@ -96,18 +147,28 @@ const App: React.FC = () => {
                 const maxX = pageDims.width / zoomLevel - updatedField.width;
                 const maxY = pageDims.height / zoomLevel - updatedField.height;
 
-                updatedField.x = Math.max(0, Math.min(updatedField.x, maxX));
-                updatedField.y = Math.max(0, Math.min(updatedField.y, maxY));
+                adjustedX = Math.max(0, Math.min(updatedField.x, maxX));
+                adjustedY = Math.max(0, Math.min(updatedField.y, maxY));
               }
             }
 
             // Update base size if style changes in create mode
-            if (updates.style && mode === AppMode.CREATE) {
-              updatedField.baseWidth = updatedField.width;
-              updatedField.baseHeight = updatedField.height;
-            }
+            const baseWidth =
+              updates.style && mode === AppMode.CREATE
+                ? updatedField.width
+                : updatedField.baseWidth;
+            const baseHeight =
+              updates.style && mode === AppMode.CREATE
+                ? updatedField.height
+                : updatedField.baseHeight;
 
-            return updatedField;
+            return {
+              ...updatedField,
+              x: adjustedX,
+              y: adjustedY,
+              baseWidth,
+              baseHeight,
+            } as Field;
           }
           return f;
         }),
@@ -121,7 +182,17 @@ const App: React.FC = () => {
 
     if (!over) return;
 
-    const fieldId = parseInt(active.id.toString().replace("text-field-", ""));
+    const activeId = active.id.toString();
+    let fieldId: number | null = null;
+
+    if (activeId.startsWith("text-field-")) {
+      fieldId = parseInt(activeId.replace("text-field-", ""));
+    } else if (activeId.startsWith("dropdown-field-")) {
+      fieldId = parseInt(activeId.replace("dropdown-field-", ""));
+    }
+
+    if (fieldId === null) return;
+
     const pageNumber = over.data.current?.pageNumber;
 
     if (!pageNumber) return;
@@ -173,7 +244,16 @@ const App: React.FC = () => {
   const handleUpdateFieldValue = useCallback(
     (fieldId: number, value: string) => {
       setFields((prev) =>
-        prev.map((f) => (f.id === fieldId ? { ...f, value } : f)),
+        prev.map((f) => {
+          if (f.id === fieldId) {
+            if (f.type === FieldType.TEXT) {
+              return { ...f, value } as TextField;
+            } else if (f.type === FieldType.DROPDOWN) {
+              return { ...f, selectedValue: value } as DropdownField;
+            }
+          }
+          return f;
+        }),
       );
     },
     [],
@@ -245,13 +325,19 @@ const App: React.FC = () => {
     setFields((prev) =>
       prev.map((f) => {
         if (f.id === fieldId) {
-          return {
+          const resetField = {
             ...f,
             x: f.baseX ?? f.x,
             y: f.baseY ?? f.y,
             width: f.baseWidth ?? STANDARD_FIELD_SIZE.width,
             height: f.baseHeight ?? STANDARD_FIELD_SIZE.height,
           };
+
+          if (f.type === FieldType.TEXT) {
+            return resetField as TextField;
+          } else if (f.type === FieldType.DROPDOWN) {
+            return resetField as DropdownField;
+          }
         }
         return f;
       }),
@@ -354,11 +440,15 @@ const App: React.FC = () => {
         <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
           {mode === AppMode.CREATE && (
             <Sidebar
+              currentFieldType={currentFieldType}
               currentStyle={currentStyle}
               currentPlaceholder={currentPlaceholder}
+              currentDropdownOptions={currentDropdownOptions}
               selectedField={selectedField}
+              onFieldTypeChange={setCurrentFieldType}
               onStyleChange={setCurrentStyle}
               onPlaceholderChange={setCurrentPlaceholder}
+              onDropdownOptionsChange={setCurrentDropdownOptions}
               onAddField={handleAddField}
               onUpdateSelectedField={handleUpdateSelectedField}
             />
