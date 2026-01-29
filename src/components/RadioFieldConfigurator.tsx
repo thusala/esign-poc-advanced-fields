@@ -26,7 +26,11 @@ import {
   Add as AddIcon,
   RadioButtonChecked,
 } from "@mui/icons-material";
-import { type RadioField, type TextFieldStyle, type RadioOption } from "../types/types";
+import {
+  type RadioField,
+  type TextFieldStyle,
+  type RadioOption,
+} from "../types/types";
 
 interface RadioFieldConfiguratorProps {
   style: TextFieldStyle;
@@ -175,9 +179,13 @@ const RadioFieldConfigurator: React.FC<RadioFieldConfiguratorProps> = ({
     }
   };
 
-  const handleUpdateOption = (optionId: string, label: string, value: string) => {
+  const handleUpdateOption = (
+    optionId: string,
+    label: string,
+    value: string,
+  ) => {
     const updatedOptions = options.map((opt) =>
-      opt.id === optionId ? { ...opt, label, value } : opt
+      opt.id === optionId ? { ...opt, label, value } : opt,
     );
     onOptionsChange(updatedOptions);
 
@@ -301,8 +309,18 @@ const RadioFieldConfigurator: React.FC<RadioFieldConfiguratorProps> = ({
 
       <List dense>
         {options.map((option) => (
-          <ListItem key={option.id} sx={{ px: 0, flexDirection: 'column', alignItems: 'flex-start' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1 }}>
+          <ListItem
+            key={option.id}
+            sx={{ px: 0, flexDirection: "column", alignItems: "flex-start" }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+                mb: 1,
+              }}
+            >
               <RadioButtonChecked sx={{ mr: 1, color: "action.disabled" }} />
               <Typography variant="body2" sx={{ flex: 1 }}>
                 Option {options.indexOf(option) + 1}
@@ -315,7 +333,7 @@ const RadioFieldConfigurator: React.FC<RadioFieldConfiguratorProps> = ({
                 <DeleteIcon />
               </IconButton>
             </Box>
-            <Box sx={{ width: '100%', pl: 4 }}>
+            <Box sx={{ width: "100%", pl: 4 }}>
               <MuiTextField
                 fullWidth
                 size="small"
@@ -369,7 +387,11 @@ const RadioFieldConfigurator: React.FC<RadioFieldConfiguratorProps> = ({
         </Button>
       </Stack>
 
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ mt: 1, display: "block" }}
+      >
         At least 2 options are required for radio buttons
       </Typography>
 

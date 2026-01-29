@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -9,7 +9,10 @@ interface ErrorBoundaryProps {
   children: React.ReactNode;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -22,34 +25,38 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error details in development
     if (import.meta.env.DEV) {
-      console.error('Error Boundary caught an error:', error, errorInfo);
+      console.error("Error Boundary caught an error:", error, errorInfo);
     }
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          padding: '20px',
-          margin: '20px',
-          border: '1px solid #ff6b6b',
-          borderRadius: '8px',
-          backgroundColor: '#ffeaea',
-          color: '#d63031'
-        }}>
+        <div
+          style={{
+            padding: "20px",
+            margin: "20px",
+            border: "1px solid #ff6b6b",
+            borderRadius: "8px",
+            backgroundColor: "#ffeaea",
+            color: "#d63031",
+          }}
+        >
           <h2>Something went wrong</h2>
           <p>Please refresh the page to try again.</p>
           {import.meta.env.DEV && this.state.error && (
-            <details style={{ marginTop: '10px' }}>
+            <details style={{ marginTop: "10px" }}>
               <summary>Error Details (Development)</summary>
-              <pre style={{
-                backgroundColor: '#f8f9fa',
-                padding: '10px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                overflow: 'auto',
-                marginTop: '10px'
-              }}>
+              <pre
+                style={{
+                  backgroundColor: "#f8f9fa",
+                  padding: "10px",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  overflow: "auto",
+                  marginTop: "10px",
+                }}
+              >
                 {this.state.error.toString()}
               </pre>
             </details>
