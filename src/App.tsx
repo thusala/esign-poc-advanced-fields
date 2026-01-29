@@ -15,8 +15,11 @@ import {
   type Field,
   type TextField,
   type DropdownField,
+  type CheckboxField,
+  type RadioField,
   type TextFieldStyle,
   type DropdownOption,
+  type RadioOption,
   AppMode,
   FieldType,
   STANDARD_FIELD_SIZE,
@@ -32,7 +35,7 @@ const App: React.FC = () => {
   const [nextFieldId, setNextFieldId] = useState(1);
 
   const [currentFieldType, setCurrentFieldType] = useState<FieldType>(
-    FieldType.TEXT,
+    FieldType.RADIO,
   );
   const [currentStyle, setCurrentStyle] = useState<TextFieldStyle>({
     fontFamily: "Arial",
@@ -51,6 +54,16 @@ const App: React.FC = () => {
     { id: "2", label: "Option 2", value: "option2" },
     { id: "3", label: "Option 3", value: "option3" },
   ]);
+  const [currentCheckboxLabel, setCurrentCheckboxLabel] = useState("Checkbox");
+  const [currentRadioQuestion, setCurrentRadioQuestion] =
+    useState("Select an option");
+  const [currentRadioOptions, setCurrentRadioOptions] = useState<RadioOption[]>(
+    [
+      { id: "1", label: "Option 1", value: "option1", selected: false },
+      { id: "2", label: "Option 2", value: "option2", selected: false },
+    ],
+  );
+  const [currentGroupId, setCurrentGroupId] = useState("");
 
   const { numPages, loading, renderPage, getPageDimensions } = usePDFDocument(
     PDF_PATH,
@@ -87,7 +100,7 @@ const App: React.FC = () => {
           border: "#2196f3",
         },
       } as TextField;
-    } else {
+    } else if (currentFieldType === FieldType.DROPDOWN) {
       newField = {
         type: FieldType.DROPDOWN,
         id: nextFieldId,
@@ -109,6 +122,55 @@ const App: React.FC = () => {
           border: "#9c27b0",
         },
       } as DropdownField;
+    } else if (currentFieldType === FieldType.CHECKBOX) {
+      newField = {
+        type: FieldType.CHECKBOX,
+        id: nextFieldId,
+        x: 50,
+        y: 50,
+        width: STANDARD_FIELD_SIZE.width,
+        height: STANDARD_FIELD_SIZE.height,
+        page: 1,
+        label: currentCheckboxLabel,
+        style: { ...currentStyle },
+        checked: false,
+        groupId: currentGroupId || undefined,
+        baseX: 50,
+        baseY: 50,
+        baseWidth: STANDARD_FIELD_SIZE.width,
+        baseHeight: STANDARD_FIELD_SIZE.height,
+        colorCodes: {
+          background: "rgba(76, 175, 80, 0.1)",
+          border: "#4caf50",
+        },
+      } as CheckboxField;
+    } else if (currentFieldType === FieldType.RADIO) {
+      // Calculate height based on number of options
+      const optionHeight = currentStyle.fontSize + 8; // font size + padding
+      const totalHeight = currentRadioOptions.length * optionHeight + 40; // options + question padding
+
+      newField = {
+        type: FieldType.RADIO,
+        id: nextFieldId,
+        x: 50,
+        y: 50,
+        width: STANDARD_FIELD_SIZE.width,
+        height: Math.max(totalHeight, STANDARD_FIELD_SIZE.height),
+        page: 1,
+        question: currentRadioQuestion,
+        style: { ...currentStyle },
+        options: [...currentRadioOptions],
+        selectedValue: "",
+        groupId: currentGroupId || `radio-group-${nextFieldId}`,
+        baseX: 50,
+        baseY: 50,
+        baseWidth: STANDARD_FIELD_SIZE.width,
+        baseHeight: Math.max(totalHeight, STANDARD_FIELD_SIZE.height),
+        colorCodes: {
+          background: "rgba(255, 193, 7, 0.1)",
+          border: "#ffc107",
+        },
+      } as RadioField;
     }
 
     setFields((prev) => [...prev, newField]);
@@ -120,6 +182,10 @@ const App: React.FC = () => {
     currentPlaceholder,
     currentStyle,
     currentDropdownOptions,
+    currentCheckboxLabel,
+    currentRadioQuestion,
+    currentRadioOptions,
+    currentGroupId,
     getPageDimensions,
   ]);
 
@@ -183,12 +249,142 @@ const App: React.FC = () => {
     if (!over) return;
 
     const activeId = active.id.toString();
+
+    // Handle new field creation
+    if (
+      activeId === "new-text-field" ||
+      activeId === "new-dropdown-field" ||
+      activeId === "new-checkbox-field" ||
+      activeId === "new-radio-field"
+    ) {
+      const pageNumber = over.data.current?.pageNumber;
+      if (!pageNumber) return;
+
+      const pageDimensions = getPageDimensions(pageNumber);
+      if (!pageDimensions) return;
+
+      let newField: Field;
+      const id = nextFieldId;
+      setNextFieldId((prev) => prev + 1);
+
+      // Default position: center of the page
+      const x =
+        (pageDimensions.width / zoomLevel - STANDARD_FIELD_SIZE.width) / 2;
+      const y =
+        (pageDimensions.height / zoomLevel - STANDARD_FIELD_SIZE.height) / 2;
+
+      if (activeId === "new-text-field") {
+        newField = {
+          id,
+          type: FieldType.TEXT,
+          x,
+          y,
+          width: STANDARD_FIELD_SIZE.width,
+          height: STANDARD_FIELD_SIZE.height,
+          page: pageNumber,
+          style: currentStyle,
+          placeholder: currentPlaceholder,
+          value: "",
+        };
+      } else if (activeId === "new-dropdown-field") {
+        newField = {
+          id,
+          type: FieldType.DROPDOWN,
+          x,
+          y,
+          width: STANDARD_FIELD_SIZE.width,
+          height: STANDARD_FIELD_SIZE.height,
+          page: pageNumber,
+          style: currentStyle,
+          placeholder: currentPlaceholder,
+          options: currentDropdownOptions,
+          value: "",
+        };
+      } else if (activeId === "new-checkbox-field") {
+        newField = {
+          id,
+          type: FieldType.CHECKBOX,
+          x,
+          y,
+          width: STANDARD_FIELD_SIZE.width,
+          height: STANDARD_FIELD_SIZE.height,
+          page: pageNumber,
+          style: currentStyle,
+          label: currentCheckboxLabel,
+          groupId: currentGroupId,
+          checked: false,
+        };
+      } else if (activeId === "new-radio-field") {
+        const optionsWithPositions = currentRadioOptions.map(
+          (option, index) => ({
+            ...option,
+            x: x,
+            y: y + index * 40, // Stack vertically with 40px gap
+          }),
+        );
+        newField = {
+          id,
+          type: FieldType.RADIO,
+          x,
+          y,
+          width: STANDARD_FIELD_SIZE.width,
+          height: STANDARD_FIELD_SIZE.height,
+          page: pageNumber,
+          style: currentStyle,
+          question: currentRadioQuestion,
+          options: optionsWithPositions,
+          groupId: currentGroupId,
+          selectedValue: null,
+        };
+      } else {
+        return;
+      }
+
+      setFields((prev) => [...prev, newField]);
+      return;
+    }
+
+    // Handle radio option dragging
+    if (activeId.startsWith("radio-option-")) {
+      const parts = activeId.split("-");
+      const fieldId = parseInt(parts[2]);
+      const optionId = parts[3];
+      const field = fields.find((f) => f.id === fieldId) as RadioField;
+      if (!field) return;
+      const option = field.options.find((o) => o.id === optionId);
+      if (!option) return;
+      const pageNumber = over.data.current?.pageNumber;
+      if (!pageNumber) return;
+      const pageDimensions = getPageDimensions(pageNumber);
+      if (!pageDimensions) return;
+      const delta = event.delta;
+      const newX = (option.x || field.x) + delta.x / zoomLevel;
+      const newY = (option.y || field.y) + delta.y / zoomLevel;
+      setFields((prev) =>
+        prev.map((f) =>
+          f.id === fieldId && f.type === FieldType.RADIO
+            ? {
+                ...f,
+                options: f.options.map((o) =>
+                  o.id === optionId ? { ...o, x: newX, y: newY } : o,
+                ),
+              }
+            : f,
+        ),
+      );
+      return;
+    }
+
     let fieldId: number | null = null;
 
     if (activeId.startsWith("text-field-")) {
       fieldId = parseInt(activeId.replace("text-field-", ""));
     } else if (activeId.startsWith("dropdown-field-")) {
       fieldId = parseInt(activeId.replace("dropdown-field-", ""));
+    } else if (activeId.startsWith("checkbox-field-")) {
+      fieldId = parseInt(activeId.replace("checkbox-field-", ""));
+    } else if (activeId.startsWith("radio-field-")) {
+      fieldId = parseInt(activeId.replace("radio-field-", ""));
     }
 
     if (fieldId === null) return;
@@ -242,14 +438,34 @@ const App: React.FC = () => {
   }, []);
 
   const handleUpdateFieldValue = useCallback(
-    (fieldId: number, value: string) => {
+    (fieldId: number, value: string | boolean) => {
       setFields((prev) =>
         prev.map((f) => {
           if (f.id === fieldId) {
             if (f.type === FieldType.TEXT) {
-              return { ...f, value } as TextField;
+              return { ...f, value: value as string } as TextField;
             } else if (f.type === FieldType.DROPDOWN) {
-              return { ...f, selectedValue: value } as DropdownField;
+              return { ...f, selectedValue: value as string } as DropdownField;
+            } else if (f.type === FieldType.CHECKBOX) {
+              return { ...f, checked: value as boolean } as CheckboxField;
+            } else if (f.type === FieldType.RADIO) {
+              // For radio buttons, update the selected field and deselect others in the same group
+              const radioField = f as RadioField;
+              return { ...f, selectedValue: value as string } as RadioField;
+            }
+          } else if (f.type === FieldType.RADIO) {
+            // Check if this field is in the same group as the updated field
+            const updatedField = prev.find((field) => field.id === fieldId);
+            if (updatedField && updatedField.type === FieldType.RADIO) {
+              const updatedRadioField = updatedField as RadioField;
+              const currentRadioField = f as RadioField;
+              if (
+                currentRadioField.groupId === updatedRadioField.groupId &&
+                currentRadioField.page === updatedRadioField.page
+              ) {
+                // Deselect other radio buttons in the same group
+                return { ...f, selectedValue: "" } as RadioField;
+              }
             }
           }
           return f;
@@ -338,6 +554,29 @@ const App: React.FC = () => {
           } else if (f.type === FieldType.DROPDOWN) {
             return resetField as DropdownField;
           }
+        }
+        return f;
+      }),
+    );
+  }, []);
+
+  const handleAddOption = useCallback((fieldId: number) => {
+    setFields((prev) =>
+      prev.map((f) => {
+        if (f.id === fieldId && f.type === FieldType.RADIO) {
+          const radioField = f as RadioField;
+          const newOptionId = `option-${Date.now()}`;
+          const newOption: RadioOption = {
+            id: newOptionId,
+            label: `Option ${radioField.options.length + 1}`,
+            value: `option${radioField.options.length + 1}`,
+            x: radioField.x,
+            y: radioField.y + radioField.options.length * 40,
+          };
+          return {
+            ...radioField,
+            options: [...radioField.options, newOption],
+          };
         }
         return f;
       }),
@@ -444,11 +683,19 @@ const App: React.FC = () => {
               currentStyle={currentStyle}
               currentPlaceholder={currentPlaceholder}
               currentDropdownOptions={currentDropdownOptions}
+              currentCheckboxLabel={currentCheckboxLabel}
+              currentRadioQuestion={currentRadioQuestion}
+              currentRadioOptions={currentRadioOptions}
+              currentGroupId={currentGroupId}
               selectedField={selectedField}
               onFieldTypeChange={setCurrentFieldType}
               onStyleChange={setCurrentStyle}
               onPlaceholderChange={setCurrentPlaceholder}
               onDropdownOptionsChange={setCurrentDropdownOptions}
+              onCheckboxLabelChange={setCurrentCheckboxLabel}
+              onRadioQuestionChange={setCurrentRadioQuestion}
+              onRadioOptionsChange={setCurrentRadioOptions}
+              onGroupIdChange={setCurrentGroupId}
               onAddField={handleAddField}
               onUpdateSelectedField={handleUpdateSelectedField}
             />
@@ -485,6 +732,7 @@ const App: React.FC = () => {
                     onUpdateFieldPosition={handleUpdateFieldPosition}
                     onUpdateFieldSize={handleUpdateFieldSize}
                     onResetFieldToBase={handleResetFieldToBase}
+                    onAddOption={handleAddOption}
                     pageDimensions={getPageDimensions(pageNum)}
                   />
                 ),

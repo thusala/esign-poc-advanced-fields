@@ -7,10 +7,19 @@ export interface TextFieldStyle {
   color: string;
 }
 
-export interface DropdownOption {
+export interface RadioOption {
   id: string;
   label: string;
   value: string;
+  selected?: boolean;
+  x?: number;
+  y?: number;
+}
+
+export interface CheckboxOption {
+  id: string;
+  label: string;
+  checked?: boolean;
 }
 
 export interface BaseField {
@@ -47,7 +56,24 @@ export interface DropdownField extends BaseField {
   selectedValue?: string;
 }
 
-export type Field = TextField | DropdownField;
+export interface CheckboxField extends BaseField {
+  type: "checkbox";
+  label: string;
+  style: TextFieldStyle;
+  checked?: boolean;
+  groupId?: string; // For grouping checkboxes
+}
+
+export interface RadioField extends BaseField {
+  type: "radio";
+  question: string;
+  style: TextFieldStyle;
+  options: RadioOption[];
+  selectedValue?: string;
+  groupId: string; // Required for grouping radio buttons
+}
+
+export type Field = TextField | DropdownField | CheckboxField | RadioField;
 
 export enum AppMode {
   CREATE = "create",
@@ -57,6 +83,8 @@ export enum AppMode {
 export enum FieldType {
   TEXT = "text",
   DROPDOWN = "dropdown",
+  CHECKBOX = "checkbox",
+  RADIO = "radio",
 }
 
 export interface PageDimensions {

@@ -1,9 +1,16 @@
 import React, { useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { Box } from "@mui/material";
-import { type Field, AppMode, FieldType } from "../types/types";
+import {
+  type Field,
+  AppMode,
+  FieldType,
+  type RadioField,
+} from "../types/types";
 import DraggableTextField from "./DraggableTextField";
 import DraggableDropdownField from "./DraggableDropdownField";
+import DraggableCheckboxField from "./DraggableCheckboxField";
+import DraggableRadioField from "./DraggableRadioField";
 
 interface PDFCanvasProps {
   pageNumber: number;
@@ -14,10 +21,11 @@ interface PDFCanvasProps {
   selectedFieldId: number | null;
   onSelectField: (fieldId: number | null) => void;
   onDeleteField: (fieldId: number) => void;
-  onUpdateFieldValue: (fieldId: number, value: string) => void;
+  onUpdateFieldValue: (fieldId: number, value: string | boolean) => void;
   onUpdateFieldPosition: (fieldId: number, x: number, y: number) => void;
   onUpdateFieldSize: (fieldId: number, width: number, height: number) => void;
   onResetFieldToBase: (fieldId: number) => void;
+  onAddOption?: (fieldId: number) => void;
   pageDimensions?: { width: number; height: number };
 }
 
@@ -34,6 +42,7 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
   onUpdateFieldPosition,
   onUpdateFieldSize,
   onResetFieldToBase,
+  onAddOption,
   pageDimensions,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -105,6 +114,38 @@ const PDFCanvas: React.FC<PDFCanvasProps> = ({
               onDelete={onDeleteField}
               onUpdateValue={onUpdateFieldValue}
               pageDimensions={pageDimensions}
+            />
+          );
+        } else if (field.type === FieldType.CHECKBOX) {
+          return (
+            <DraggableCheckboxField
+              key={field.id}
+              field={field}
+              zoomLevel={zoomLevel}
+              mode={mode}
+              isSelected={selectedFieldId === field.id}
+              onSelect={onSelectField}
+              onDelete={onDeleteField}
+              onUpdateValue={onUpdateFieldValue}
+              pageDimensions={pageDimensions}
+            />
+          );
+        } else if (field.type === FieldType.RADIO) {
+          return (
+            <DraggableRadioField
+              key={field.id}
+              field={field}
+              zoomLevel={zoomLevel}
+              mode={mode}
+              isSelected={selectedFieldId === field.id}
+              onSelect={onSelectField}
+              onDelete={onDeleteField}
+              onUpdateValue={onUpdateFieldValue}
+              onAddOption={onAddOption}
+              pageDimensions={pageDimensions}
+              allFields={
+                fields.filter((f) => f.type === FieldType.RADIO) as RadioField[]
+              }
             />
           );
         }
